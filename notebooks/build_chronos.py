@@ -200,6 +200,12 @@ def chronos2_forecast(checkpoint, horizon, target, context_df, cov=False):
         id_column="id",
         timestamp_column="timestamp",
         target=target,
+        # Real trading-day data has irregular holiday gaps that break pandas'
+        # frequency auto-detection (pd.infer_freq wants a perfectly regular step) --
+        # "B" (business day) is the standard convention for market data and avoids
+        # relying on inference at all. Only affects the timestamps predict_df
+        # generates internally, not the forecast values we actually score.
+        freq="B",
     )
     quantile_forecasts = {q: pred_df[str(q)].to_numpy() for q in QUANTILE_LEVELS}
     point_forecast = quantile_forecasts[0.5]
@@ -231,6 +237,7 @@ _probe_pred = _pipeline.predict_df(
     id_column="id",
     timestamp_column="timestamp",
     target="log_return",
+    freq="B",
 )
 print(_probe_pred.columns.tolist())
 _probe_pred.head()
