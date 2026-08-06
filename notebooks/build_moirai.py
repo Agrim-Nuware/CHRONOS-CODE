@@ -25,26 +25,32 @@ Output: `moirai_results.csv`, one row per (version, variant, target, horizon, wi
 """))
 
 cells.append(md("""\
-**Dependency list below is uni2ts's actual `pyproject.toml` `dependencies`**, not a
-guess -- deliberately install everything it declares **except `torch` and `numpy`**:
-uni2ts pins `torch>=2.1,<2.5` and `numpy~=1.26.0`, and letting pip "satisfy" those on
-Colab would downgrade its preinstalled GPU-enabled torch build (and numpy, which half
-of Colab's preinstalled stack is compiled against) -- a much worse problem than
-leaving those two slightly out of uni2ts's preferred range. `--no-deps` on the
-`pip install -e .` step keeps uni2ts's own install from re-triggering that same
-resolution.
+**Why `gluonts` is installed with `--no-deps`, unlike everything else below:**
+`gluonts~=0.14.3` (needed for API compatibility with uni2ts's code) declares
+`numpy~=1.16` and `pandas<2.2.0` as dependencies. Letting pip "satisfy" those would
+downgrade Colab's numpy from 2.x down to ~1.26 -- and Colab's preinstalled pandas is
+compiled against numpy 2.x's ABI, so that downgrade breaks pandas' compiled
+`_libs.algos`/`_libs.hashtable` extensions in a way that **a kernel restart can't
+fix**, because at that point the files on disk are genuinely inconsistent with each
+other, not just stale in memory (this took two earlier attempts to actually pin down).
+Installing gluonts with `--no-deps` and adding its handful of *other* dependencies by
+hand (pydantic, tqdm, toolz, typing-extensions -- none of which touch numpy/pandas)
+avoids the downgrade entirely, so Colab's own already-consistent numpy/pandas/torch
+never get touched.
+
+The rest of this list is uni2ts's actual `pyproject.toml` `dependencies` (not a guess),
+still excluding `torch` and `numpy` for the same reason -- and `scipy` is left
+unpinned rather than using uni2ts's `~=1.11.3`, since that specific pin is *also* an
+indirect numpy-downgrade vector (`scipy~=1.11.3` requires `numpy<1.28.0`).
 """))
 
 cells.append(code("""\
-!pip install -q "lightning>=2.0" "gluonts~=0.14.3" "scipy~=1.11.3" "einops==0.7.*" \\
-    "jaxtyping~=0.2.24" "python-dotenv==1.0.0" "hydra-core==1.3" orjson tensorboard \\
-    multiprocess "huggingface_hub>=0.23.0" safetensors "datasets~=2.17.1" "jax[cpu]" \\
-    yfinance
+!pip install -q --no-deps "gluonts~=0.14.3"
+!pip install -q "pydantic<3,>=1.7" "tqdm~=4.23" "toolz~=0.10" "typing-extensions~=4.0"
 
-# gluonts pins pandas<2.2.0, so the install above silently downgrades pandas on disk
-# (Colab ships something newer). Pin it back up explicitly -- see the note below on
-# why this alone isn't enough.
-!pip install -q -U "pandas>=2.2"
+!pip install -q "lightning>=2.0" scipy "einops==0.7.*" "jaxtyping~=0.2.24" \\
+    "python-dotenv==1.0.0" "hydra-core==1.3" orjson tensorboard multiprocess \\
+    "huggingface_hub>=0.23.0" safetensors "datasets~=2.17.1" "jax[cpu]" yfinance
 
 # Always clone fresh: if an earlier attempt in this session left a partial/broken
 # `uni2ts` directory behind, a skip-if-exists check would silently keep reusing it.
@@ -55,33 +61,16 @@ cells.append(code("""\
 """))
 
 cells.append(md("""\
-## This cell force-restarts the runtime -- expected, not a bug
-
-Colab's kernel has pandas already loaded **before this notebook's first cell even
-runs** (it preloads pandas for its own dataframe-rendering UI) -- both the pure-Python
-layer and pandas' compiled C extensions (`pandas._libs.*`). `gluonts`'s install two
-cells up downgrades pandas' files on disk to satisfy its `pandas<2.2.0` pin, and we
-pin it back up right after -- but that only changes files on disk, not what's already
-loaded in this process's memory. Once a compiled extension has been loaded, deleting it
-from `sys.modules` and re-importing does **not** force it to reload -- that's a
-pure-Python-only trick, and pandas' `_libs.algos`/`_libs.hashtable` etc. are compiled.
-The only reliable fix is a real process restart, so this cell forces one on purpose.
-
-**What happens next:** running the cell below will show something like "Your session
-crashed" -- that's the restart, not a failure. Everything installed/cloned above lives
-on Colab's VM disk and survives the restart; only in-memory Python state resets. After
-it restarts, **continue by running the cells below this one** (select the next cell and
-use Runtime -> "Run after", or just click through) -- don't re-run the install cell
-above, and don't use "Run all" again from the top, since that would re-trigger the same
-gluonts pandas downgrade before the next restart-worthy step.
+**Why the explicit `sys.path.insert` below:** `pip install -e .` registers an import
+hook via a `.pth` file, but an already-running kernel doesn't reliably pick that up
+mid-session -- often only takes effect after a restart. Inserting the source path
+directly makes `import uni2ts` work in this same session, no restart needed. (Restarts
+are no longer part of this notebook at all now that numpy/pandas are never touched --
+that was only ever needed to work around the downgrade above.)
 """))
 
 cells.append(code("""\
-import os
-os.kill(os.getpid(), 9)
-"""))
-
-cells.append(code("""\
+import io
 import os
 import sys
 
@@ -93,12 +82,9 @@ import torch
 import yfinance as yf
 from einops import rearrange
 
-print("pandas:", pd.__version__)
-assert not pd.__version__.startswith("2.1"), (
-    "pandas is still on the gluonts-downgraded version -- the restart cell above "
-    "didn't actually restart the kernel. Runtime -> Restart session manually, then "
-    "re-run from this cell (not from the top)."
-)
+print("numpy:", np.__version__, "| pandas:", pd.__version__)
+pd.DataFrame({"x": [1, 2]}).to_csv(io.StringIO())  # smoke-test the exact op that broke before
+print("pandas CSV write sanity check passed")
 
 import uni2ts
 print("uni2ts loaded from:", uni2ts.__file__)
