@@ -30,16 +30,48 @@ TimesFM-2.5's quantile head is the first one Google describes as actually calibr
 Output: `timesfm_1_2_results.csv`, one row per (version, target, horizon, window).
 """))
 
-cells.append(code("""\
-!pip install -q "timesfm[torch]==1.3.0" yfinance
+cells.append(md("""\
+**Why this clones the repo instead of `pip install timesfm==1.3.0`:** every PyPI
+release of the old API (up to and including 1.3.0) declares `requires-python <3.12`,
+and Colab runs Python 3.12 -- pip refuses to install any of them here at all, full
+stop, no version pin fixes that. But that's a packaging-metadata restriction, not a
+real code incompatibility: checking the actual source (`v1/src/timesfm/timesfm_torch.py`
+and `timesfm_base.py`), the torch backend only genuinely imports numpy, pandas, torch,
+`huggingface_hub`, and `utilsforecast` -- nothing that's actually Python-3.12-incompatible.
+Cloning the same source PyPI would have installed and adding it to `sys.path` directly
+sidesteps pip's version gate entirely.
 """))
 
 cells.append(code("""\
+!rm -rf timesfm_v1_repo
+!git clone --depth 1 https://github.com/google-research/timesfm.git timesfm_v1_repo
+!ls timesfm_v1_repo/v1/src/timesfm   # sanity check -- should list timesfm_base.py, timesfm_torch.py, ...
+!pip install -q "huggingface_hub[cli]>=0.23.0" "utilsforecast>=0.1.10" yfinance
+"""))
+
+cells.append(md("""\
+**Why `TimesFmTorch` is imported directly instead of `timesfm.TimesFm`:** the
+package's `__init__.py` tries the JAX backend first and only falls back to torch if
+JAX isn't importable -- and Colab often ships JAX preinstalled by default, which would
+silently pick the wrong backend for our PyTorch checkpoints. Importing the torch class
+by name sidesteps that guesswork regardless of what else happens to be on this machine.
+"""))
+
+cells.append(code("""\
+import os
+import sys
+
+sys.path.insert(0, os.path.abspath("timesfm_v1_repo/v1/src"))
+
 import numpy as np
 import pandas as pd
 import torch
 import yfinance as yf
-import timesfm
+
+from timesfm.timesfm_base import TimesFmCheckpoint, TimesFmHparams
+from timesfm.timesfm_torch import TimesFmTorch as TimesFm
+import timesfm as _timesfm_pkg
+print("timesfm loaded from:", _timesfm_pkg.__file__)
 
 print("torch:", torch.__version__, "| CUDA available:", torch.cuda.is_available())
 BACKEND = "gpu" if torch.cuda.is_available() else "cpu"
@@ -172,9 +204,9 @@ def get_tfm(checkpoint, num_layers, horizon):
     )
     if num_layers is not None:
         hparams_kwargs["num_layers"] = num_layers
-    tfm = timesfm.TimesFm(
-        hparams=timesfm.TimesFmHparams(**hparams_kwargs),
-        checkpoint=timesfm.TimesFmCheckpoint(huggingface_repo_id=checkpoint),
+    tfm = TimesFm(
+        hparams=TimesFmHparams(**hparams_kwargs),
+        checkpoint=TimesFmCheckpoint(huggingface_repo_id=checkpoint),
     )
     _tfm_cache[key] = tfm
     return tfm
