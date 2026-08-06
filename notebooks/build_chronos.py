@@ -176,7 +176,7 @@ cells.append(code("""\
 def base_chronos_forecast(checkpoint, horizon, target_values):
     pipeline = get_pipeline("base", checkpoint)
     quantiles, _mean = pipeline.predict_quantiles(
-        context=torch.tensor(target_values, dtype=torch.float32),
+        inputs=torch.tensor(target_values, dtype=torch.float32),
         prediction_length=horizon,
         quantile_levels=QUANTILE_LEVELS,
     )
