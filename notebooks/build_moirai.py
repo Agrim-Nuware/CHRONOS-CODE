@@ -55,22 +55,30 @@ cells.append(code("""\
 """))
 
 cells.append(md("""\
-**Two separate mid-session-install gotchas, both fixed here:**
+## This cell force-restarts the runtime -- expected, not a bug
 
-1. `pip install -e .` registers an import hook via a `.pth` file, but an already-running
-   kernel doesn't reliably pick that up mid-session -- often only takes effect after a
-   restart. Fixed the same way as before: `sys.path.insert` the source dir directly.
-2. Colab's kernel has pandas already loaded in memory (for its own dataframe-rendering
-   UI) *before this notebook's first cell even runs*. `gluonts`'s install above
-   downgrades pandas' files on disk to satisfy its `pandas<2.2.0` pin, then we pin it
-   back up -- but that changes files on disk, not what's already cached in Python's
-   `sys.modules`. Later, the first time some not-yet-imported pandas submodule (like
-   the CSV writer) actually gets imported, it loads fresh from whatever's on disk *at
-   that moment*, which can now disagree with the already-cached classes from before --
-   symptom: `AttributeError: 'Index' object has no attribute '_format_native_types'`
-   the first time you call `.to_csv()`, even though everything else worked fine.
-   Fixed by dropping every cached `pandas*` module below so the next `import pandas`
-   is a single, fully consistent, fresh load off whatever's on disk right now.
+Colab's kernel has pandas already loaded **before this notebook's first cell even
+runs** (it preloads pandas for its own dataframe-rendering UI) -- both the pure-Python
+layer and pandas' compiled C extensions (`pandas._libs.*`). `gluonts`'s install two
+cells up downgrades pandas' files on disk to satisfy its `pandas<2.2.0` pin, and we
+pin it back up right after -- but that only changes files on disk, not what's already
+loaded in this process's memory. Once a compiled extension has been loaded, deleting it
+from `sys.modules` and re-importing does **not** force it to reload -- that's a
+pure-Python-only trick, and pandas' `_libs.algos`/`_libs.hashtable` etc. are compiled.
+The only reliable fix is a real process restart, so this cell forces one on purpose.
+
+**What happens next:** running the cell below will show something like "Your session
+crashed" -- that's the restart, not a failure. Everything installed/cloned above lives
+on Colab's VM disk and survives the restart; only in-memory Python state resets. After
+it restarts, **continue by running the cells below this one** (select the next cell and
+use Runtime -> "Run after", or just click through) -- don't re-run the install cell
+above, and don't use "Run all" again from the top, since that would re-trigger the same
+gluonts pandas downgrade before the next restart-worthy step.
+"""))
+
+cells.append(code("""\
+import os
+os.kill(os.getpid(), 9)
 """))
 
 cells.append(code("""\
@@ -79,10 +87,6 @@ import sys
 
 sys.path.insert(0, os.path.abspath("uni2ts/src"))
 
-for _mod in list(sys.modules):
-    if _mod == "pandas" or _mod.startswith("pandas."):
-        del sys.modules[_mod]
-
 import numpy as np
 import pandas as pd
 import torch
@@ -90,12 +94,16 @@ import yfinance as yf
 from einops import rearrange
 
 print("pandas:", pd.__version__)
-assert not pd.__version__.startswith("2.1"), "pandas still downgraded -- rerun the install cell above"
+assert not pd.__version__.startswith("2.1"), (
+    "pandas is still on the gluonts-downgraded version -- the restart cell above "
+    "didn't actually restart the kernel. Runtime -> Restart session manually, then "
+    "re-run from this cell (not from the top)."
+)
 
 import uni2ts
 print("uni2ts loaded from:", uni2ts.__file__)
 assert os.path.isdir(os.path.join(os.path.dirname(uni2ts.__file__), "model")), (
-    "uni2ts.model missing -- the git clone likely failed silently; check the cell above's output"
+    "uni2ts.model missing -- the git clone likely failed silently; check the install cell's output"
 )
 
 print("torch:", torch.__version__, "| CUDA available:", torch.cuda.is_available())
