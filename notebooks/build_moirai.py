@@ -26,18 +26,35 @@ Output: `moirai_results.csv`, one row per (version, variant, target, horizon, wi
 
 cells.append(code("""\
 !pip install -q "gluonts[torch]" einops jaxtyping lightning yfinance
-!git clone -q https://github.com/SalesforceAIResearch/uni2ts.git
-%cd uni2ts
-!pip install -q -e . --no-deps
-%cd ..
+![ -d uni2ts ] || git clone -q https://github.com/SalesforceAIResearch/uni2ts.git
+!cd uni2ts && pip install -q -e . --no-deps
+"""))
+
+cells.append(md("""\
+**Why the explicit `sys.path.insert` below, on top of the `pip install -e .` above:**
+`pip install -e .` registers an import hook via a `.pth` file, but an already-running
+kernel doesn't reliably pick that up mid-session -- it often only takes effect after a
+runtime restart. Inserting the source path directly makes `import uni2ts` work in this
+same session regardless of that timing, no restart required.
 """))
 
 cells.append(code("""\
+import os
+import sys
+
+sys.path.insert(0, os.path.abspath("uni2ts/src"))
+
 import numpy as np
 import pandas as pd
 import torch
 import yfinance as yf
 from einops import rearrange
+
+import uni2ts
+print("uni2ts loaded from:", uni2ts.__file__)
+assert os.path.isdir(os.path.join(os.path.dirname(uni2ts.__file__), "model")), (
+    "uni2ts.model missing -- the git clone likely failed silently; check the cell above's output"
+)
 
 print("torch:", torch.__version__, "| CUDA available:", torch.cuda.is_available())
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
