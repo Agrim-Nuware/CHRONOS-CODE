@@ -24,8 +24,22 @@ demonstrates covariates for Moirai-1.0/MoE, so we don't rely on it here.
 Output: `moirai_results.csv`, one row per (version, variant, target, horizon, window).
 """))
 
+cells.append(md("""\
+**Dependency list below is uni2ts's actual `pyproject.toml` `dependencies`**, not a
+guess -- deliberately install everything it declares **except `torch` and `numpy`**:
+uni2ts pins `torch>=2.1,<2.5` and `numpy~=1.26.0`, and letting pip "satisfy" those on
+Colab would downgrade its preinstalled GPU-enabled torch build (and numpy, which half
+of Colab's preinstalled stack is compiled against) -- a much worse problem than
+leaving those two slightly out of uni2ts's preferred range. `--no-deps` on the
+`pip install -e .` step keeps uni2ts's own install from re-triggering that same
+resolution.
+"""))
+
 cells.append(code("""\
-!pip install -q "gluonts[torch]" einops jaxtyping lightning yfinance
+!pip install -q "lightning>=2.0" "gluonts~=0.14.3" "scipy~=1.11.3" "einops==0.7.*" \\
+    "jaxtyping~=0.2.24" "python-dotenv==1.0.0" "hydra-core==1.3" orjson tensorboard \\
+    multiprocess "huggingface_hub>=0.23.0" safetensors "datasets~=2.17.1" "jax[cpu]" \\
+    yfinance
 
 # Always clone fresh: if an earlier attempt in this session left a partial/broken
 # `uni2ts` directory behind, a skip-if-exists check would silently keep reusing it.
