@@ -41,6 +41,11 @@ cells.append(code("""\
     multiprocess "huggingface_hub>=0.23.0" safetensors "datasets~=2.17.1" "jax[cpu]" \\
     yfinance
 
+# gluonts pins pandas<2.2.0, so the install above silently downgrades pandas on disk
+# (Colab ships something newer). Pin it back up explicitly -- see the note below on
+# why this alone isn't enough.
+!pip install -q -U "pandas>=2.2"
+
 # Always clone fresh: if an earlier attempt in this session left a partial/broken
 # `uni2ts` directory behind, a skip-if-exists check would silently keep reusing it.
 !rm -rf uni2ts
@@ -50,11 +55,22 @@ cells.append(code("""\
 """))
 
 cells.append(md("""\
-**Why the explicit `sys.path.insert` below, on top of the `pip install -e .` above:**
-`pip install -e .` registers an import hook via a `.pth` file, but an already-running
-kernel doesn't reliably pick that up mid-session -- it often only takes effect after a
-runtime restart. Inserting the source path directly makes `import uni2ts` work in this
-same session regardless of that timing, no restart required.
+**Two separate mid-session-install gotchas, both fixed here:**
+
+1. `pip install -e .` registers an import hook via a `.pth` file, but an already-running
+   kernel doesn't reliably pick that up mid-session -- often only takes effect after a
+   restart. Fixed the same way as before: `sys.path.insert` the source dir directly.
+2. Colab's kernel has pandas already loaded in memory (for its own dataframe-rendering
+   UI) *before this notebook's first cell even runs*. `gluonts`'s install above
+   downgrades pandas' files on disk to satisfy its `pandas<2.2.0` pin, then we pin it
+   back up -- but that changes files on disk, not what's already cached in Python's
+   `sys.modules`. Later, the first time some not-yet-imported pandas submodule (like
+   the CSV writer) actually gets imported, it loads fresh from whatever's on disk *at
+   that moment*, which can now disagree with the already-cached classes from before --
+   symptom: `AttributeError: 'Index' object has no attribute '_format_native_types'`
+   the first time you call `.to_csv()`, even though everything else worked fine.
+   Fixed by dropping every cached `pandas*` module below so the next `import pandas`
+   is a single, fully consistent, fresh load off whatever's on disk right now.
 """))
 
 cells.append(code("""\
@@ -63,11 +79,18 @@ import sys
 
 sys.path.insert(0, os.path.abspath("uni2ts/src"))
 
+for _mod in list(sys.modules):
+    if _mod == "pandas" or _mod.startswith("pandas."):
+        del sys.modules[_mod]
+
 import numpy as np
 import pandas as pd
 import torch
 import yfinance as yf
 from einops import rearrange
+
+print("pandas:", pd.__version__)
+assert not pd.__version__.startswith("2.1"), "pandas still downgraded -- rerun the install cell above"
 
 import uni2ts
 print("uni2ts loaded from:", uni2ts.__file__)
