@@ -284,11 +284,53 @@ print(f"\\nWrote timesfm_1_2_results.csv ({len(results_df)} rows)")
 results_df.groupby(["version", "target", "horizon"])[["mase", "smape", "wql"]].mean()
 """))
 
+cells.append(md("""\
+## Example-window trajectories (for illustrative charts)
+
+The sweep above only kept metrics per window, not the actual forecast values --
+too much data to carry for 60 windows x 3 targets x 2 checkpoints. This captures the
+full history/actual/naive/forecast trajectory for just **one** window (the most
+recent one, `ORIGINS[-1]`), reusing the already-loaded models from the sweep above
+(fast -- no re-downloading).
+"""))
+
+cells.append(code("""\
+EXAMPLE_ORIGIN = ORIGINS[-1]
+EXAMPLE_HORIZON = 21
+
+example_rows = []
+for spec in TIMESFM_REGISTRY:
+    for target in TARGETS:
+        context_df, future_df = build_window(df, EXAMPLE_ORIGIN, CONTEXT_LENGTH, EXAMPLE_HORIZON)
+        target_values = context_df[target].to_numpy()
+        actual = future_df[target].to_numpy()
+        point_forecast, _ = timesfm_forecast(
+            spec["checkpoint"], spec["num_layers"], spec["use_positional_embedding"],
+            EXAMPLE_HORIZON, target_values,
+        )
+        naive = np.full(EXAMPLE_HORIZON, target_values[-1])
+
+        series = [("history", context_df.index, target_values), ("actual", future_df.index, actual),
+                  ("naive", future_df.index, naive), ("forecast", future_df.index, point_forecast)]
+        for series_name, dates, values in series:
+            for date, value in zip(dates, values):
+                example_rows.append({
+                    "family": "timesfm", "version": spec["version"], "checkpoint": spec["checkpoint"],
+                    "target": target, "series": series_name, "date": str(date.date()), "value": float(value),
+                })
+    print(f"example window done: {spec['checkpoint']}")
+
+example_df = pd.DataFrame(example_rows)
+example_df.to_csv("timesfm_1_2_example_windows.csv", index=False)
+print(f"Wrote timesfm_1_2_example_windows.csv ({len(example_df)} rows)")
+"""))
+
 cells.append(md("## Download results"))
 
 cells.append(code("""\
 from google.colab import files
 files.download("timesfm_1_2_results.csv")
+files.download("timesfm_1_2_example_windows.csv")
 """))
 
 write_notebook(cells, os.path.join(os.path.dirname(os.path.abspath(__file__)), "03a_timesfm_1_2.ipynb"))

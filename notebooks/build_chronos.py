@@ -285,11 +285,53 @@ print(f"\\nWrote chronos_results.csv ({len(results_df)} rows)")
 results_df.groupby(["version", "variant", "target", "horizon"])[["mase", "smape", "wql"]].mean()
 """))
 
+cells.append(md("""\
+## Example-window trajectories (for illustrative charts)
+
+The sweep above only kept metrics per window, not the actual forecast values --
+too much data to carry for 60 windows x 9 checkpoints. This captures the full
+history/actual/naive/forecast trajectory for just **one** window (the most recent
+one, `ORIGINS[-1]`), reusing the already-loaded pipelines from the sweep above (fast
+-- no re-downloading). Univariate only, so all 9 models' charts are directly comparable.
+"""))
+
+cells.append(code("""\
+EXAMPLE_ORIGIN = ORIGINS[-1]
+EXAMPLE_HORIZON = 21
+
+example_rows = []
+for spec in CHRONOS_REGISTRY:
+    for target in TARGETS:
+        context_df, future_df = build_window(df, EXAMPLE_ORIGIN, CONTEXT_LENGTH, EXAMPLE_HORIZON)
+        target_values = context_df[target].to_numpy()
+        actual = future_df[target].to_numpy()
+        if spec["cls"] == "base":
+            point_forecast, _ = base_chronos_forecast(spec["checkpoint"], EXAMPLE_HORIZON, target_values)
+        else:
+            point_forecast, _ = chronos2_forecast(spec["checkpoint"], EXAMPLE_HORIZON, target, context_df, cov=False)
+        naive = np.full(EXAMPLE_HORIZON, target_values[-1])
+
+        series = [("history", context_df.index, target_values), ("actual", future_df.index, actual),
+                  ("naive", future_df.index, naive), ("forecast", future_df.index, point_forecast)]
+        for series_name, dates, values in series:
+            for date, value in zip(dates, values):
+                example_rows.append({
+                    "family": "chronos", "version": spec["version"], "checkpoint": spec["checkpoint"],
+                    "target": target, "series": series_name, "date": str(date.date()), "value": float(value),
+                })
+    print(f"example window done: {spec['checkpoint']}")
+
+example_df = pd.DataFrame(example_rows)
+example_df.to_csv("chronos_example_windows.csv", index=False)
+print(f"Wrote chronos_example_windows.csv ({len(example_df)} rows)")
+"""))
+
 cells.append(md("## Download results"))
 
 cells.append(code("""\
 from google.colab import files
 files.download("chronos_results.csv")
+files.download("chronos_example_windows.csv")
 """))
 
 write_notebook(cells, os.path.join(os.path.dirname(os.path.abspath(__file__)), "02_chronos_family.ipynb"))
