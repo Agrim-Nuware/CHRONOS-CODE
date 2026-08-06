@@ -289,6 +289,83 @@ plt.show()
 """))
 
 cells.append(md("""\
+## Example-window charts: one figure per model
+
+For each of the 9 checkpoints, one figure with 3 panels (price / simple return / log
+return) showing that model's zero-shot forecast against the actual outcome and a
+naive persistence baseline, for the single most recent backtest window (21-day
+horizon). Requires the 4 `*_example_windows.csv` files downloaded from the Colab
+notebooks alongside the main results CSVs.
+"""))
+
+cells.append(code("""\
+EXAMPLE_FILES = [
+    "moirai_example_windows.csv", "chronos_example_windows.csv",
+    "timesfm_1_2_example_windows.csv", "timesfm_25_example_windows.csv",
+]
+
+example_frames = []
+for fname in EXAMPLE_FILES:
+    path = os.path.join(RESULTS_DIR, fname)
+    if not os.path.exists(path):
+        print(f"MISSING: {path} -- download it from the corresponding Colab notebook first.")
+        continue
+    example_frames.append(pd.read_csv(path, dtype={"version": str}))
+
+example_all = pd.concat(example_frames, ignore_index=True)
+example_all["date"] = pd.to_datetime(example_all["date"])
+example_all["model"] = example_all.apply(model_label, axis=1)
+print(f"{len(example_all)} rows across {example_all['model'].nunique()} checkpoints")
+"""))
+
+cells.append(code("""\
+SERIES_STYLE = {
+    "history": dict(color=INK, linestyle="-", linewidth=1.4, label="History (Close)"),
+    "actual": dict(color=INK, linestyle="--", linewidth=1.8, label="Actual"),
+    "naive": dict(color=INK_MUTED, linestyle="-.", linewidth=1.4, label="Naive (persistence)"),
+}
+TARGET_TITLE = {"price": "Price level", "simple_return": "Simple return", "log_return": "Log return"}
+
+# Context is 512 days but the horizon is only 21 -- plotting the full history makes
+# the forecast/actual/naive comparison a barely-visible sliver at the right edge.
+# Showing only the recent tail keeps proportions readable, closer to a typical
+# history:horizon ratio of ~3:1 rather than ~24:1.
+HISTORY_TAIL_DAYS = 60
+
+
+def plot_example_window(model_name, family, rows_for_model):
+    fig, axes = plt.subplots(1, 3, figsize=(16, 4.5))
+    for ax, target in zip(axes, ["price", "simple_return", "log_return"]):
+        sub = rows_for_model[rows_for_model["target"] == target]
+        for series_name, style in SERIES_STYLE.items():
+            s = sub[sub["series"] == series_name].sort_values("date")
+            if series_name == "history":
+                s = s.tail(HISTORY_TAIL_DAYS)
+            ax.plot(s["date"], s["value"], **style)
+        fc = sub[sub["series"] == "forecast"].sort_values("date")
+        ax.plot(fc["date"], fc["value"], color=FAMILY_COLOR[family], linewidth=2.2,
+                 label=f"{model_name} (zero-shot)")
+        ax.set_title(TARGET_TITLE[target])
+        ax.tick_params(axis="x", rotation=30)
+        ax.grid(axis="y", linewidth=0.6, zorder=0)
+        ax.set_axisbelow(True)
+
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 1.12), ncol=4, frameon=False)
+    fig.suptitle(f"{model_name} -- example window (most recent, 21-day horizon)", y=1.2)
+    fig.tight_layout()
+
+    safe_name = model_name.replace(" ", "_").replace("/", "_")
+    fig.savefig(os.path.join(FIGURES_DIR, f"example_window_{safe_name}.png"), dpi=160, bbox_inches="tight")
+    return fig
+
+
+for (family, model_name), rows_for_model in example_all.groupby(["family", "model"]):
+    plot_example_window(model_name, family, rows_for_model)
+    plt.show()
+"""))
+
+cells.append(md("""\
 ## All figures saved to `../results/figures/`
 
 `summary_table.csv` in `../results/` has the full numeric table behind every chart --
