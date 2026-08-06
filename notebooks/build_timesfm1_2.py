@@ -183,15 +183,22 @@ def compute_window_metrics(actual, point_forecast, quantile_forecasts, context):
 cells.append(md("## TimesFM 1.0/2.0 registry + cached loading"))
 
 cells.append(code("""\
+# num_layers and use_positional_embedding are architecture-specific, not just size
+# knobs -- 1.0 (200M) and 2.0 (500M) are genuinely different architectures under the
+# same old API. TimesFmHparams' own defaults (num_layers=20, use_positional_embedding=
+# True) already match 1.0; the official example only overrides both for 2.0. An
+# earlier version of this notebook applied 2.0's overrides to both checkpoints, which
+# doesn't crash -- it just silently feeds 1.0 the wrong position-encoding scheme and
+# produces badly degraded (but not obviously broken-looking) forecasts.
 TIMESFM_REGISTRY = [
-    {"version": "1.0", "checkpoint": "google/timesfm-1.0-200m-pytorch", "num_layers": None},
-    {"version": "2.0", "checkpoint": "google/timesfm-2.0-500m-pytorch", "num_layers": 50},
+    {"version": "1.0", "checkpoint": "google/timesfm-1.0-200m-pytorch", "num_layers": None, "use_positional_embedding": True},
+    {"version": "2.0", "checkpoint": "google/timesfm-2.0-500m-pytorch", "num_layers": 50, "use_positional_embedding": False},
 ]
 
 _tfm_cache = {}
 
 
-def get_tfm(checkpoint, num_layers, horizon):
+def get_tfm(checkpoint, num_layers, use_positional_embedding, horizon):
     key = (checkpoint, horizon)
     if key in _tfm_cache:
         return _tfm_cache[key]
@@ -200,7 +207,7 @@ def get_tfm(checkpoint, num_layers, horizon):
         per_core_batch_size=32,
         horizon_len=horizon,
         context_len=CONTEXT_LENGTH,
-        use_positional_embedding=False,
+        use_positional_embedding=use_positional_embedding,
     )
     if num_layers is not None:
         hparams_kwargs["num_layers"] = num_layers
@@ -223,16 +230,17 @@ before trusting the quantile indexing in the sweep.
 """))
 
 cells.append(code("""\
+_spec0 = TIMESFM_REGISTRY[0]
 _ctx0, _ = build_window(df, ORIGINS[0], CONTEXT_LENGTH, HORIZONS[0])
-_tfm0 = get_tfm(TIMESFM_REGISTRY[0]["checkpoint"], TIMESFM_REGISTRY[0]["num_layers"], HORIZONS[0])
+_tfm0 = get_tfm(_spec0["checkpoint"], _spec0["num_layers"], _spec0["use_positional_embedding"], HORIZONS[0])
 _point, _quantile = _tfm0.forecast([_ctx0["log_return"].to_numpy()], freq=[0])
 print("point_forecast shape:", np.asarray(_point).shape)
 print("quantile_forecast shape:", np.asarray(_quantile).shape)
 """))
 
 cells.append(code("""\
-def timesfm_forecast(checkpoint, num_layers, horizon, target_values):
-    tfm = get_tfm(checkpoint, num_layers, horizon)
+def timesfm_forecast(checkpoint, num_layers, use_positional_embedding, horizon, target_values):
+    tfm = get_tfm(checkpoint, num_layers, use_positional_embedding, horizon)
     point_forecast, quantile_forecast = tfm.forecast([target_values], freq=[0])
     point_forecast = np.asarray(point_forecast)[0]  # (horizon,)
     quantile_forecast = np.asarray(quantile_forecast)[0]  # (horizon, 10): mean, q0.1..q0.9
@@ -253,7 +261,8 @@ for spec in TIMESFM_REGISTRY:
                 actual = future_df[target].to_numpy()
 
                 point_forecast, quantile_forecasts = timesfm_forecast(
-                    spec["checkpoint"], spec["num_layers"], horizon, target_values
+                    spec["checkpoint"], spec["num_layers"], spec["use_positional_embedding"],
+                    horizon, target_values,
                 )
                 m = compute_window_metrics(actual, point_forecast, quantile_forecasts, target_values)
                 rows.append({
