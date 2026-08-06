@@ -48,7 +48,7 @@ FAMILY_COLOR = {"moirai": "#2a78d6", "chronos": "#eb6834", "timesfm": "#1baf7a"}
 VARIANT_COLOR = {"uni": "#2a78d6", "cov": "#eb6834"}
 REGIME_COLOR = {"calm": "#2a78d6", "high_vol": "#eb6834"}
 VERSION_MARKER = {
-    "1.0": "o", "moe": "s", "2.0": "^",
+    "1.0": "o", "moe": "s", "2.0": "^", "2.5": "D",
     "original": "o", "bolt": "s", "2": "^",
 }
 
