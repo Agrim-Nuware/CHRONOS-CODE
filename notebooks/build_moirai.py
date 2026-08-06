@@ -26,8 +26,13 @@ Output: `moirai_results.csv`, one row per (version, variant, target, horizon, wi
 
 cells.append(code("""\
 !pip install -q "gluonts[torch]" einops jaxtyping lightning yfinance
-![ -d uni2ts ] || git clone -q https://github.com/SalesforceAIResearch/uni2ts.git
-!cd uni2ts && pip install -q -e . --no-deps
+
+# Always clone fresh: if an earlier attempt in this session left a partial/broken
+# `uni2ts` directory behind, a skip-if-exists check would silently keep reusing it.
+!rm -rf uni2ts
+!git clone https://github.com/SalesforceAIResearch/uni2ts.git
+!ls uni2ts/src/uni2ts/model   # sanity check -- should list moirai, moirai_moe, moirai2, ...
+!cd uni2ts && pip install -e . --no-deps
 """))
 
 cells.append(md("""\
