@@ -322,6 +322,9 @@ print(f"Wrote {RESULTS_DIR}/example_windows_all.csv -- raw data behind all 27 ex
 """))
 
 cells.append(code("""\
+FORECAST_COLOR = "#eb6834"  # one consistent color for the forecast line across all 9 models --
+                            # this chart shows one model at a time, so family-color-coding (used
+                            # elsewhere to tell 9 checkpoints apart in one chart) doesn't apply here.
 SERIES_STYLE = {
     "history": dict(color=INK, linestyle="-", linewidth=1.4, label="History (Close)"),
     "actual": dict(color=INK, linestyle="--", linewidth=1.8, label="Actual"),
@@ -336,7 +339,7 @@ TARGET_TITLE = {"price": "Close", "simple_return": "Return", "log_return": "Log 
 HISTORY_TAIL_DAYS = 60
 
 
-def plot_example_window(model_name, family, rows_for_model):
+def plot_example_window(model_name, rows_for_model):
     fig, axes = plt.subplots(1, 3, figsize=(16, 4.5))
     for ax, target in zip(axes, ["price", "simple_return", "log_return"]):
         sub = rows_for_model[rows_for_model["target"] == target]
@@ -346,7 +349,7 @@ def plot_example_window(model_name, family, rows_for_model):
                 s = s.tail(HISTORY_TAIL_DAYS)
             ax.plot(s["date"], s["value"], **style)
         fc = sub[sub["series"] == "forecast"].sort_values("date")
-        ax.plot(fc["date"], fc["value"], color=FAMILY_COLOR[family], linewidth=2.2,
+        ax.plot(fc["date"], fc["value"], color=FORECAST_COLOR, linewidth=2.2,
                  label=f"{model_name} (zero-shot)")
         ax.set_title(TARGET_TITLE[target])
         ax.tick_params(axis="x", rotation=30)
@@ -363,8 +366,8 @@ def plot_example_window(model_name, family, rows_for_model):
     return fig
 
 
-for (family, model_name), rows_for_model in example_all.groupby(["family", "model"]):
-    plot_example_window(model_name, family, rows_for_model)
+for model_name, rows_for_model in example_all.groupby("model"):
+    plot_example_window(model_name, rows_for_model)
     plt.show()
 """))
 
