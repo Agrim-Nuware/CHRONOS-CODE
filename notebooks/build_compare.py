@@ -316,6 +316,9 @@ example_all = pd.concat(example_frames, ignore_index=True)
 example_all["date"] = pd.to_datetime(example_all["date"])
 example_all["model"] = example_all.apply(model_label, axis=1)
 print(f"{len(example_all)} rows across {example_all['model'].nunique()} checkpoints")
+
+example_all.to_csv(os.path.join(RESULTS_DIR, "example_windows_all.csv"), index=False)
+print(f"Wrote {RESULTS_DIR}/example_windows_all.csv -- raw data behind all 27 example-window graphs")
 """))
 
 cells.append(code("""\
@@ -324,7 +327,7 @@ SERIES_STYLE = {
     "actual": dict(color=INK, linestyle="--", linewidth=1.8, label="Actual"),
     "naive": dict(color=INK_MUTED, linestyle="-.", linewidth=1.4, label="Naive (persistence)"),
 }
-TARGET_TITLE = {"price": "Price level", "simple_return": "Simple return", "log_return": "Log return"}
+TARGET_TITLE = {"price": "Close", "simple_return": "Return", "log_return": "Log return"}
 
 # Context is 512 days but the horizon is only 21 -- plotting the full history makes
 # the forecast/actual/naive comparison a barely-visible sliver at the right edge.
