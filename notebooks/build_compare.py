@@ -349,7 +349,7 @@ FORECAST_COLOR = "#eb6834"  # one consistent color for the forecast line across 
 SERIES_STYLE = {
     "history": dict(color=INK, linestyle="-", linewidth=1.4, label="History (Close)"),
     "actual": dict(color=INK, linestyle="--", linewidth=1.8, label="Actual"),
-    "naive": dict(color=INK_MUTED, linestyle="-.", linewidth=1.4, label="Naive (persistence)"),
+    "naive": dict(color="#2a78d6", linestyle="-.", linewidth=1.4, label="Naive (persistence)"),
 }
 TARGET_TITLE = {"price": "Close", "simple_return": "Return", "log_return": "Log return"}
 
