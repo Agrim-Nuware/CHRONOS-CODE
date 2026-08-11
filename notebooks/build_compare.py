@@ -91,6 +91,48 @@ def model_label(row):
     return names.get((row["family"], row["version"]), f"{row['family']}-{row['version']}")
 """))
 
+cells.append(md("""\
+## Upload result CSVs (Colab only)
+
+If any of the 8 CSVs (4 `*_results.csv` + 4 `*_example_windows.csv`, downloaded from
+the 4 model-family notebooks) aren't already in `../results/`, this opens a file-picker
+so you can select them all at once -- only relevant on Colab, since a fresh clone never
+has them. Running this locally with the files already in place is a no-op.
+"""))
+
+cells.append(code("""\
+try:
+    import google.colab
+    IN_COLAB = True
+except ImportError:
+    IN_COLAB = False
+
+EXPECTED_FILES = [
+    "moirai_results.csv", "chronos_results.csv", "timesfm_1_2_results.csv", "timesfm_25_results.csv",
+    "moirai_example_windows.csv", "chronos_example_windows.csv",
+    "timesfm_1_2_example_windows.csv", "timesfm_25_example_windows.csv",
+]
+missing = [f for f in EXPECTED_FILES if not os.path.exists(os.path.join(RESULTS_DIR, f))]
+
+if missing and IN_COLAB:
+    print(f"Missing {len(missing)} file(s) in {RESULTS_DIR} -- pick them now (can select all 8 at once):")
+    for f in missing:
+        print(" -", f)
+    from google.colab import files
+    uploaded = files.upload()
+    for fname in uploaded:
+        os.replace(fname, os.path.join(RESULTS_DIR, fname))
+    still_missing = [f for f in EXPECTED_FILES if not os.path.exists(os.path.join(RESULTS_DIR, f))]
+    if still_missing:
+        print(f"Still missing after upload: {still_missing}")
+    else:
+        print("All 8 files present.")
+elif missing:
+    print(f"Missing {len(missing)} file(s) in {RESULTS_DIR}: {missing}")
+else:
+    print("All 8 files already present.")
+"""))
+
 cells.append(md("## Load + combine all four result files"))
 
 cells.append(code("""\
