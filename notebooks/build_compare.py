@@ -172,6 +172,46 @@ summary
 """))
 
 cells.append(md("""\
+## Naive baseline: how much error does "just repeat yesterday" give?
+
+Computed independently of the 9 checkpoints -- same 60 windows, same targets/horizons,
+same MASE/sMAPE/WQL formulas from `harness/metrics.py`, but the "forecast" is just the
+last observed context value repeated across the whole horizon (no model, no GPU
+needed). This is the actual number every model is implicitly being compared against.
+"""))
+
+cells.append(code("""\
+from harness import windows as hwindows, metrics as hmetrics
+from harness.config import CONTEXT_LENGTH, HORIZONS, NUM_WINDOWS, TARGETS, QUANTILE_LEVELS
+
+_naive_df = load_dataset()
+_origins = hwindows.make_origins(len(_naive_df), CONTEXT_LENGTH, max(HORIZONS), NUM_WINDOWS)
+
+naive_rows = []
+for horizon in HORIZONS:
+    for target in TARGETS:
+        for origin in _origins:
+            context_df, future_df = hwindows.build_window(_naive_df, origin, CONTEXT_LENGTH, horizon, target)
+            context_values = context_df[target].to_numpy()
+            actual = future_df[target].to_numpy()
+            naive_point = np.full(horizon, context_values[-1])
+            naive_quantiles = {q: naive_point for q in QUANTILE_LEVELS}
+            m = hmetrics.compute_window_metrics(actual, naive_point, naive_quantiles, context_values)
+            naive_rows.append({"target": target, "horizon": horizon, **m})
+
+naive_summary = (
+    pd.DataFrame(naive_rows)
+    .groupby(["target", "horizon"])[["mase", "smape", "wql"]]
+    .mean()
+    .round(4)
+    .reset_index()
+)
+naive_summary.to_csv(os.path.join(RESULTS_DIR, "naive_baseline.csv"), index=False)
+print(f"Wrote {RESULTS_DIR}/naive_baseline.csv")
+naive_summary
+"""))
+
+cells.append(md("""\
 ## Headline chart: MASE across all 9 checkpoints
 
 One target/horizon slice at a time (price, 21-day horizon by default -- change
