@@ -117,14 +117,20 @@ summary
 cells.append(md("""\
 ## Headline chart: MASE across all 9 checkpoints
 
-One target/horizon slice at a time (log return, 21-day horizon by default -- change
-`TARGET`/`HORIZON` below to look at others). Bars grouped and colored by family so a
-9th color is never invented for the 9th checkpoint -- version is carried by the x-axis
-label instead of by hue.
+One target/horizon slice at a time (price, 21-day horizon by default -- change
+`TARGET`/`HORIZON` below to look at others, e.g. the return targets). Bars grouped and
+colored by family so a 9th color is never invented for the 9th checkpoint -- version is
+carried by the x-axis label instead of by hue.
+
+Price is the default here (rather than a return target) because MASE/sMAPE/WQL all
+show real separation between the 9 checkpoints on price -- on the return targets,
+every model converges close to the same near-zero forecast (the statistically correct
+move for a near-random-walk series), so the bars end up nearly indistinguishable
+regardless of which of the three metrics you pick.
 """))
 
 cells.append(code("""\
-TARGET = "log_return"
+TARGET = "price"
 HORIZON = 21
 
 
