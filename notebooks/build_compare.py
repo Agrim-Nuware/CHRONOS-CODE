@@ -26,12 +26,27 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+# This notebook assumes harness/ and results/ sit as siblings of notebooks/, which is
+# only true if you're running from inside a full clone of the repo. Opening this
+# notebook straight from a GitHub/Colab link instead drops you in /content with none
+# of that -- so auto-clone here if harness/ isn't already a sibling directory.
+def _has_harness():
+    return os.path.isdir(os.path.join("..", "harness"))
+
+if not _has_harness():
+    if not os.path.isdir("CHRONOS-CODE"):
+        os.system("git clone -q https://github.com/Agrim-Nuware/CHRONOS-CODE.git")
+    os.chdir("CHRONOS-CODE/notebooks")
+
+assert _has_harness(), "harness/ still not found as a sibling of notebooks/ -- the clone above likely failed."
+
 sys.path.insert(0, os.path.dirname(os.getcwd()))
 from harness.data import load_dataset
 
 RESULTS_DIR = os.path.join("..", "results")
 FIGURES_DIR = os.path.join(RESULTS_DIR, "figures")
 os.makedirs(FIGURES_DIR, exist_ok=True)
+print("Working directory:", os.getcwd())
 """))
 
 cells.append(md("## Palette (validated categorical set — see the `dataviz` skill's reference palette)"))
