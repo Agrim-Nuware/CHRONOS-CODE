@@ -38,6 +38,10 @@ MODEL_REGISTRY = [
     {"family": "timesfm", "version": "1.0", "checkpoint": "google/timesfm-1.0-200m-pytorch", "variants": ["uni"]},
     {"family": "timesfm", "version": "2.0", "checkpoint": "google/timesfm-2.0-500m-pytorch", "variants": ["uni"]},
     {"family": "timesfm", "version": "2.5", "checkpoint": "google/timesfm-2.5-200m-pytorch", "variants": ["uni"]},
+    # Classical statistical baseline, not a foundation model -- fixed order, no
+    # per-window tuning, so it's directly comparable in spirit to the zero-shot
+    # checkpoints above (nobody hand-tunes a model per window here either).
+    {"family": "arima", "version": "auto", "checkpoint": "statsmodels.tsa.arima.model.ARIMA", "variants": ["uni"]},
 ]
 
 RESULTS_COLUMNS = [

@@ -25,6 +25,7 @@ REGISTRY = [
     {"family": "timesfm", "version": "1.0", "variants": ["uni"]},
     {"family": "timesfm", "version": "2.0", "variants": ["uni"]},
     {"family": "timesfm", "version": "2.5", "variants": ["uni"]},
+    {"family": "arima", "version": "auto", "variants": ["uni"]},
 ]
 
 rows = []
@@ -64,6 +65,7 @@ timesfm_all[timesfm_all["version"].isin(["1.0", "2.0"])].to_csv(
 timesfm_all[timesfm_all["version"] == "2.5"].to_csv(
     os.path.join(results_dir, "timesfm_25_results.csv"), index=False
 )
+out[out["family"] == "arima"].to_csv(os.path.join(results_dir, "arima_results.csv"), index=False)
 print("wrote fake result CSVs to", results_dir)
 
 # --- Fake example-window trajectories, matching the schema each real notebook writes
@@ -106,5 +108,8 @@ timesfm_examples[timesfm_examples["version"].isin(["1.0", "2.0"])].to_csv(
 )
 timesfm_examples[timesfm_examples["version"] == "2.5"].to_csv(
     os.path.join(results_dir, "timesfm_25_example_windows.csv"), index=False
+)
+example_out[example_out["family"] == "arima"].to_csv(
+    os.path.join(results_dir, "arima_example_windows.csv"), index=False
 )
 print("wrote fake example-window CSVs to", results_dir)

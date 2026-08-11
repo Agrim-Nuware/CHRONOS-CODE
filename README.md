@@ -1,13 +1,17 @@
-# S&P 500 Zero-Shot Forecasting: Moirai vs. Chronos vs. TimesFM
+# S&P 500 Forecasting: Moirai vs. Chronos vs. TimesFM vs. ARIMA
 
 Zero-shot (no fine-tuning) accuracy comparison of 9 checkpoints across the Moirai,
-Chronos, and TimesFM foundation-model families, on a rolling backtest of the S&P 500.
+Chronos, and TimesFM foundation-model families, plus a classical ARIMA baseline, on a
+rolling backtest of the S&P 500.
 
 ## What's being compared
 
-- **9 checkpoints**: Moirai-1.0-R-large, Moirai-MoE-1.0-R-base, Moirai-2.0-R-small,
-  chronos-t5-large, chronos-bolt-base, chronos-2, timesfm-1.0-200m, timesfm-2.0-500m,
-  timesfm-2.5-200m.
+- **9 zero-shot checkpoints**: Moirai-1.0-R-large, Moirai-MoE-1.0-R-base,
+  Moirai-2.0-R-small, chronos-t5-large, chronos-bolt-base, chronos-2, timesfm-1.0-200m,
+  timesfm-2.0-500m, timesfm-2.5-200m.
+- **1 classical baseline**: ARIMA (fixed order, no per-window tuning -- see
+  `05_arima_baseline.ipynb`), the actual statistical benchmark all 9 checkpoints are
+  implicitly being compared against.
 - **3 targets**: S&P 500 close price level, simple return, log return.
 - **2 horizons**: 5 trading days, 21 trading days.
 - **60 rolling-origin backtest windows** spanning 2005-2026 (same origins reused
@@ -19,17 +23,18 @@ Chronos, and TimesFM foundation-model families, on a rolling backtest of the S&P
 - **Metrics**: MASE, sMAPE, WQL (mean weighted quantile loss), computed per window
   then averaged.
 
-## Why Colab, and why 4 notebooks instead of 1
+## Why Colab, and why 5 notebooks instead of 1
 
 This machine has no GPU (integrated Intel graphics only), so the actual model
 inference runs on **Google Colab** with a GPU runtime. Everything data/metrics-related
 was built and tested locally first (see `harness/`); the Colab notebooks inline that
 same logic so each one is self-contained and needs no upload besides itself.
 
-Four Colab notebooks instead of one because the three families need incompatible
+Five Colab notebooks instead of one because the three families need incompatible
 pip environments (different torch versions, and TimesFM 1.0/2.0 vs. 2.5 are
 literally different, mutually-incompatible package versions under the same
-`timesfm` import name):
+`timesfm` import name) -- and ARIMA gets its own notebook since it's not a
+foundation model at all (no torch, no GPU, just `statsmodels`):
 
 | Notebook | Covers | Output |
 |---|---|---|
@@ -37,17 +42,19 @@ literally different, mutually-incompatible package versions under the same
 | `02_chronos_family.ipynb` | Chronos (original), Chronos-Bolt, Chronos-2 | `chronos_results.csv` |
 | `03a_timesfm_1_2.ipynb` | TimesFM-1.0, TimesFM-2.0 | `timesfm_1_2_results.csv` |
 | `03b_timesfm_25.ipynb` | TimesFM-2.5 | `timesfm_25_results.csv` |
+| `05_arima_baseline.ipynb` | ARIMA (classical baseline, CPU-only) | `arima_results.csv` |
 
 ## How to run
 
-1. Upload each of the 4 notebooks to [Google Colab](https://colab.research.google.com)
+1. Upload each of the 5 notebooks to [Google Colab](https://colab.research.google.com)
    (File -> Upload notebook), one at a time.
-2. For each: **Runtime -> Change runtime type -> T4 GPU** (or better), then
-   **Runtime -> Run all**.
+2. For the 4 foundation-model notebooks (`01`-`03b`): **Runtime -> Change runtime type
+   -> T4 GPU** (or better), then **Runtime -> Run all**. For `05_arima_baseline.ipynb`,
+   no GPU is needed -- the default CPU runtime is fine.
 3. Each notebook ends with a `files.download(...)` call that pushes its results CSV
    to your browser's downloads. Save each one into this project's `results/` folder,
    keeping the exact filename.
-4. Once all 4 CSVs are in `results/`, open `notebooks/04_compare_results.ipynb`
+4. Once all 5 CSVs are in `results/`, open `notebooks/04_compare_results.ipynb`
    **locally** (this one needs no GPU, just pandas/matplotlib) and run it top to
    bottom. It writes `results/summary_table.csv` and PNG charts to
    `results/figures/` -- those are the mentor-facing deliverables.
@@ -103,8 +110,9 @@ that's a one-line indexing fix, not a redesign.
 ```
 harness/            local-only: data fetch, windowing, metrics (tested against real yfinance data)
 notebooks/
-  01-03b*.ipynb      upload these to Colab
-  04_compare_results.ipynb   run this locally after downloading the 4 result CSVs
+  01-03b*.ipynb      upload these to Colab (GPU)
+  05_arima_baseline.ipynb   upload this to Colab too (no GPU needed)
+  04_compare_results.ipynb   run this locally after downloading the 5 result CSVs
   build_*.py         regenerate the .ipynb files from these if you need to tweak them
-results/            put the 4 downloaded CSVs here; summary_table.csv + figures/ land here after step 4
+results/            put the 5 downloaded CSVs here; summary_table.csv + figures/ land here after step 4
 ```

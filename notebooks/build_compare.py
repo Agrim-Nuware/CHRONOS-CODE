@@ -7,14 +7,14 @@ from _build import write_notebook, md, code
 cells = []
 
 cells.append(md("""\
-# S&P 500 Zero-Shot Forecasting — Results Comparison
+# S&P 500 Forecasting — Results Comparison
 
 **Runs locally** (plain pandas/matplotlib, no GPU or model libraries needed). Combines
-the four results CSVs produced by the Colab notebooks
-(`01_moirai_family`, `02_chronos_family`, `03a_timesfm_1_2`, `03b_timesfm_25`) into the
-tables and charts for the mentor presentation.
+the five results CSVs produced by the Colab notebooks
+(`01_moirai_family`, `02_chronos_family`, `03a_timesfm_1_2`, `03b_timesfm_25`,
+`05_arima_baseline`) into the tables and charts for the mentor presentation.
 
-**Before running:** download all four `*_results.csv` files from Colab and place them
+**Before running:** download all five `*_results.csv` files from Colab and place them
 in `../results/` (same names, unchanged).
 """))
 
@@ -59,12 +59,12 @@ GRIDLINE = "#e1e0d9"
 BASELINE = "#c3c2b7"
 SURFACE = "#fcfcfb"
 
-FAMILY_COLOR = {"moirai": "#2a78d6", "chronos": "#eb6834", "timesfm": "#1baf7a"}
+FAMILY_COLOR = {"moirai": "#2a78d6", "chronos": "#eb6834", "timesfm": "#1baf7a", "arima": "#6b7280"}
 VARIANT_COLOR = {"uni": "#2a78d6", "cov": "#eb6834"}
 REGIME_COLOR = {"calm": "#2a78d6", "high_vol": "#eb6834"}
 VERSION_MARKER = {
     "1.0": "o", "moe": "s", "2.0": "^", "2.5": "D",
-    "original": "o", "bolt": "s", "2": "^",
+    "original": "o", "bolt": "s", "2": "^", "auto": "X",
 }
 
 plt.rcParams.update({
@@ -87,6 +87,7 @@ def model_label(row):
         ("moirai", "1.0"): "Moirai-1.0", ("moirai", "moe"): "Moirai-MoE", ("moirai", "2.0"): "Moirai-2.0",
         ("chronos", "original"): "Chronos", ("chronos", "bolt"): "Chronos-Bolt", ("chronos", "2"): "Chronos-2",
         ("timesfm", "1.0"): "TimesFM-1.0", ("timesfm", "2.0"): "TimesFM-2.0", ("timesfm", "2.5"): "TimesFM-2.5",
+        ("arima", "auto"): "ARIMA",
     }
     return names.get((row["family"], row["version"]), f"{row['family']}-{row['version']}")
 """))
@@ -94,10 +95,11 @@ def model_label(row):
 cells.append(md("""\
 ## Upload result CSVs (Colab only)
 
-If any of the 8 CSVs (4 `*_results.csv` + 4 `*_example_windows.csv`, downloaded from
-the 4 model-family notebooks) aren't already in `../results/`, this opens a file-picker
-so you can select them all at once -- only relevant on Colab, since a fresh clone never
-has them. Running this locally with the files already in place is a no-op.
+If any of the 10 CSVs (5 `*_results.csv` + 5 `*_example_windows.csv`, downloaded from
+the 4 model-family notebooks plus the ARIMA baseline notebook) aren't already in
+`../results/`, this opens a file-picker so you can select them all at once -- only
+relevant on Colab, since a fresh clone never has them. Running this locally with the
+files already in place is a no-op.
 """))
 
 cells.append(code("""\
@@ -109,13 +111,14 @@ except ImportError:
 
 EXPECTED_FILES = [
     "moirai_results.csv", "chronos_results.csv", "timesfm_1_2_results.csv", "timesfm_25_results.csv",
+    "arima_results.csv",
     "moirai_example_windows.csv", "chronos_example_windows.csv",
-    "timesfm_1_2_example_windows.csv", "timesfm_25_example_windows.csv",
+    "timesfm_1_2_example_windows.csv", "timesfm_25_example_windows.csv", "arima_example_windows.csv",
 ]
 missing = [f for f in EXPECTED_FILES if not os.path.exists(os.path.join(RESULTS_DIR, f))]
 
 if missing and IN_COLAB:
-    print(f"Missing {len(missing)} file(s) in {RESULTS_DIR} -- pick them now (can select all 8 at once):")
+    print(f"Missing {len(missing)} file(s) in {RESULTS_DIR} -- pick them now (can select all 10 at once):")
     for f in missing:
         print(" -", f)
     from google.colab import files
@@ -126,17 +129,20 @@ if missing and IN_COLAB:
     if still_missing:
         print(f"Still missing after upload: {still_missing}")
     else:
-        print("All 8 files present.")
+        print("All 10 files present.")
 elif missing:
     print(f"Missing {len(missing)} file(s) in {RESULTS_DIR}: {missing}")
 else:
-    print("All 8 files already present.")
+    print("All 10 files already present.")
 """))
 
-cells.append(md("## Load + combine all four result files"))
+cells.append(md("## Load + combine all five result files"))
 
 cells.append(code("""\
-FILES = ["moirai_results.csv", "chronos_results.csv", "timesfm_1_2_results.csv", "timesfm_25_results.csv"]
+FILES = [
+    "moirai_results.csv", "chronos_results.csv", "timesfm_1_2_results.csv", "timesfm_25_results.csv",
+    "arima_results.csv",
+]
 
 frames = []
 for fname in FILES:
@@ -212,18 +218,20 @@ naive_summary
 """))
 
 cells.append(md("""\
-## Headline chart: MASE across all 9 checkpoints
+## Headline chart: MASE across all 10 checkpoints
 
 One target/horizon slice at a time (price, 21-day horizon by default -- change
 `TARGET`/`HORIZON` below to look at others, e.g. the return targets). Bars grouped and
-colored by family so a 9th color is never invented for the 9th checkpoint -- version is
-carried by the x-axis label instead of by hue.
+colored by family (including ARIMA, the classical baseline) so a 10th color is never
+invented for the 10th checkpoint -- version is carried by the x-axis label instead of
+by hue. A dotted line marks the naive ("repeat yesterday") baseline for direct
+reference -- see the cell above for how it's computed.
 
 Price is the default here (rather than a return target) because MASE/sMAPE/WQL all
-show real separation between the 9 checkpoints on price -- on the return targets,
-every model converges close to the same near-zero forecast (the statistically correct
-move for a near-random-walk series), so the bars end up nearly indistinguishable
-regardless of which of the three metrics you pick.
+show real separation between the checkpoints on price -- on the return targets, every
+model converges close to the same near-zero forecast (the statistically correct move
+for a near-random-walk series), so the bars end up nearly indistinguishable regardless
+of which of the three metrics you pick.
 """))
 
 cells.append(code("""\
@@ -247,9 +255,18 @@ def plot_headline(metric, target=TARGET, horizon=HORIZON, variant="uni"):
     ax.grid(axis="y", linewidth=0.6, zorder=0)
     ax.set_axisbelow(True)
 
-    family_display = {"moirai": "Moirai", "chronos": "Chronos", "timesfm": "TimesFM"}
-    handles = [plt.Rectangle((0, 0), 1, 1, color=c) for c in FAMILY_COLOR.values()]
-    ax.legend(handles, [family_display[f] for f in FAMILY_COLOR], frameon=False, loc="upper right")
+    naive_row = naive_summary[(naive_summary["target"] == target) & (naive_summary["horizon"] == horizon)]
+    if not naive_row.empty:
+        ax.axhline(naive_row[metric].iloc[0], color=INK_MUTED, linestyle=":", linewidth=1.6, zorder=3)
+
+    family_display = {"moirai": "Moirai", "chronos": "Chronos", "timesfm": "TimesFM", "arima": "ARIMA"}
+    present_families = [f for f in FAMILY_COLOR if f in subset["family"].unique()]
+    handles = [plt.Rectangle((0, 0), 1, 1, color=FAMILY_COLOR[f]) for f in present_families]
+    labels = [family_display[f] for f in present_families]
+    if not naive_row.empty:
+        handles.append(plt.Line2D([0], [0], color=INK_MUTED, linestyle=":", linewidth=1.6))
+        labels.append("Naive baseline")
+    ax.legend(handles, labels, frameon=False, loc="upper right")
 
     fig.tight_layout()
     fig.savefig(os.path.join(FIGURES_DIR, f"headline_{metric}_{target}_{horizon}d_{variant}.png"), dpi=160)
@@ -394,17 +411,18 @@ plt.show()
 cells.append(md("""\
 ## Example-window charts: one figure per model
 
-For each of the 9 checkpoints, one figure with 3 panels (price / simple return / log
-return) showing that model's zero-shot forecast against the actual outcome and a
-naive persistence baseline, for the single most recent backtest window (21-day
-horizon). Requires the 4 `*_example_windows.csv` files downloaded from the Colab
-notebooks alongside the main results CSVs.
+For each of the 10 checkpoints (9 zero-shot foundation models + the ARIMA baseline),
+one figure with 3 panels (price / simple return / log return) showing that model's
+forecast against the actual outcome and a naive persistence baseline, for the single
+most recent backtest window (21-day horizon). Requires the 5 `*_example_windows.csv`
+files downloaded from the Colab notebooks alongside the main results CSVs.
 """))
 
 cells.append(code("""\
 EXAMPLE_FILES = [
     "moirai_example_windows.csv", "chronos_example_windows.csv",
     "timesfm_1_2_example_windows.csv", "timesfm_25_example_windows.csv",
+    "arima_example_windows.csv",
 ]
 
 example_frames = []
@@ -421,13 +439,13 @@ example_all["model"] = example_all.apply(model_label, axis=1)
 print(f"{len(example_all)} rows across {example_all['model'].nunique()} checkpoints")
 
 example_all.to_csv(os.path.join(RESULTS_DIR, "example_windows_all.csv"), index=False)
-print(f"Wrote {RESULTS_DIR}/example_windows_all.csv -- raw data behind all 27 example-window graphs")
+print(f"Wrote {RESULTS_DIR}/example_windows_all.csv -- raw data behind all 30 example-window graphs")
 """))
 
 cells.append(code("""\
-FORECAST_COLOR = "#eb6834"  # one consistent color for the forecast line across all 9 models --
+FORECAST_COLOR = "#eb6834"  # one consistent color for the forecast line across all 10 models --
                             # this chart shows one model at a time, so family-color-coding (used
-                            # elsewhere to tell 9 checkpoints apart in one chart) doesn't apply here.
+                            # elsewhere to tell 10 checkpoints apart in one chart) doesn't apply here.
 SERIES_STYLE = {
     "history": dict(color=INK, linestyle="-", linewidth=1.4, label="History (Close)"),
     "actual": dict(color=INK, linestyle="--", linewidth=1.8, label="Actual"),
